@@ -8,6 +8,7 @@ import Sail.Sail
 open LeanRV64DExecutable
 
 open Register
+open Sail.ArchSem
 
 def readElf (elfFilepath : System.FilePath) : IO (Except String RawELFFile) := do
   let bytes <- IO.FS.readBinFile elfFilepath
@@ -78,6 +79,78 @@ def initializeMemory (_size: MachineBits) (elf : ELF64File) : Std.ExtHashMap Nat
         ) mem' elf.bits_and_bobs
 
   mem
+
+structure EmulatorState where
+  regs : Std.ExtDHashMap Register RegisterType
+  mem : Std.ExtHashMap Nat (BitVec 8)
+  cycleCount : Nat
+  sailOutput : Array String
+
+abbrev EmulatorM := EStateM (Sail.Error exception) EmulatorState
+
+def readMemoryByte (addr : Nat) : EmulatorM (BitVec 8) := do
+  let .some byte := (← get).mem.get? addr
+    | throw (.OutOfMemoryRange addr)
+  pure byte
+
+def readMemoryBytes (size : Nat) (addr : Nat) : EmulatorM (BitVec (8 * size)) :=
+  match size with
+  | 0 => pure default
+  | 1 => do
+    let byte ← readMemoryByte addr
+    have h : 8 * 1 = 8 := rfl
+    return h ▸ byte
+  | n + 1 => do
+    let byte ← readMemoryByte addr
+    let bytes ← readMemoryBytes n (addr + 1)
+    have h : 8 * n + 8 = 8 * (n + 1) := by omega
+    return h ▸ bytes.append byte
+
+def writeMemoryByte (addr : Nat) (value : BitVec 8) : EmulatorM Unit :=
+  modify fun state => { state with mem := state.mem.insert addr value }
+
+def writeMemoryBytes (addr : Nat) (value : BitVec (8 * n)) : EmulatorM Unit := do
+  let bytes := List.ofFn fun i : Fin n =>
+    (addr + i.val, value.extractLsb' (8 * i.val) 8)
+  bytes.forM fun (byteAddr, byte) => writeMemoryByte byteAddr byte
+
+def interpretInstructionEffect :
+    (effect : InstructionEffect) → EmulatorM effect.ret
+  | .regRead reg _accessType => do
+    let .some value := (← get).regs.get? reg
+      | throw .Unreachable
+    pure value
+  | .regWrite reg _accessType value =>
+    modify fun state => { state with regs := state.regs.insert reg value }
+  | .memRead request => do
+    let value ← readMemoryBytes request.size request.address.toNat
+    pure (.ok (value, default))
+  | .memWrite request value _tags => do
+    writeMemoryBytes request.address.toNat value
+    pure (.ok ())
+  | .memWriteAnnounce _request => pure ()
+  | .barrier _barrier => pure ()
+  | .cacheOp _operation => pure ()
+  | .tlbOp _operation => pure ()
+  | .clockCycle =>
+    modify fun state => { state with cycleCount := state.cycleCount + 1 }
+  | .getCycleCount => return (← get).cycleCount
+  | .translationStart _translation => pure ()
+  | .translationEnd _translation => pure ()
+  | .archException _exception => pure ()
+  | .returnException => pure ()
+  | .printMessage message =>
+    modify fun state => { state with sailOutput := state.sailOutput.push message }
+
+def interpretSailEffect :
+    (effect : (Except (Sail.Error exception) InstructionEffect) ⊕ FinChoice) →
+      EmulatorM (Effect.ret effect)
+  | .inl (.error error) => throw error
+  | .inl (.ok effect) => interpretInstructionEffect effect
+  | .inr choice =>
+    match choice with
+    | Nat.zero => throw .Unreachable
+    | Nat.succ n => pure ⟨0, Nat.zero_lt_succ n⟩
 
 def is_tohost (s : ELF64SectionHeaderTableEntry × InterpretedSection) : Bool :=
   s.snd.section_name_as_string == some ".tohost"
@@ -276,12 +349,13 @@ def runElf64 (elf : ELF64File) : IO UInt32 :=
   do
     let mem := initializeMemory MachineBits.B64 elf
     let regs := Std.ExtDHashMap.emptyWithCapacity
-    let initialState := ⟨regs, (), mem, default, default, default⟩
+    let initialState : EmulatorState := ⟨regs, mem, 0, #[]⟩
     let main := do
       sail_model_init ()
       initializeRegisters elf
       my_main elf
-    match main.run initialState with
+    let result := (FreeM.liftM interpretSailEffect main).run initialState
+    match result with
     | .ok res s => do
       for m in s.sailOutput do
         IO.print m
