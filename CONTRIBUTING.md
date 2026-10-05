@@ -54,3 +54,20 @@ check that requires commits to be signed. See
 [here](https://developercertificate.org) for what the DCO states. The
 [DCO check](https://github.com/apps/dco) requires adding the `-s` flag
 to your `git commit` command.
+
+## Updating the Rocq opam package
+
+The committed [`rocq-sail-riscv.opam`](./rocq-sail-riscv.opam) file lets
+opam discover the package in a fresh checkout. To update the package,
+edit [`rocq-sail-riscv.opam.in`](./rocq-sail-riscv.opam.in) or the version
+settings in [`cmake/project_version.cmake`](./cmake/project_version.cmake)
+and [`cmake/sail_required_version.txt`](./cmake/sail_required_version.txt),
+then regenerate the file:
+
+```sh
+cmake -P rocq-sail-riscv.cmake
+```
+
+If present, `cmake/sail_required_version_rocq.txt` overrides the Sail
+version for this package. Commit the regenerated `.opam` file together
+with its inputs; the Rocq CI checks that they match.

@@ -1,0 +1,37 @@
+# Generated from rocq-sail-riscv.opam.in; regenerate with:
+#   cmake -P rocq-sail-riscv.cmake
+opam-version: "2.0"
+name: "rocq-sail-riscv"
+version: "0.14.1"
+maintainer: "Sail Devs <cl-sail-dev@lists.cam.ac.uk>"
+authors: "Sail RISC-V contributors"
+homepage: "https://github.com/riscv/sail-riscv/"
+bug-reports: "https://github.com/riscv/sail-riscv/issues"
+license: "BSD-2-Clause"
+dev-repo: "git+https://github.com/riscv/sail-riscv.git"
+build: [
+  # Turn off all downloads for sandboxing; they're not required for the Rocq build anyway
+  ["cmake" "-S" "." "-B" "build" "-DCMAKE_BUILD_TYPE=RelWithDebInfo" "-DDOWNLOAD_GMP=FALSE" "-DDOWNLOAD_JSONCONS=FALSE" "-DDOWNLOAD_CLI11=FALSE" "-DDOWNLOAD_ASIO=FALSE"]
+  ["cmake" "--build" "build" "--target" "build_rocq_rv64d" "build_rocq_rv32d"]
+]
+install: [
+  ["sh" "-c" "install -d `rocq c -where`/user-contrib/Riscv"]
+  ["sh" "-c" "install build/rocq/* `rocq c -where`/user-contrib/Riscv"]
+]
+depends: [
+  "sail" {>= "0.20.3"}
+  "sail_c_backend" {>= "0.20.3"}
+  "sail_coq_backend" {>= "0.20.3"}
+  "sail_doc_backend" {>= "0.20.3"}
+  "sail_latex_backend" {>= "0.20.3"}
+  "sail_lean_backend" {>= "0.20.3"}
+  "sail_lem_backend" {>= "0.20.3"}
+  "sail_smt_backend" {>= "0.20.3"}
+  "sail_sv_backend" {>= "0.20.3"}
+  "sail_ocaml_backend" {>= "0.20.3"}
+  "sail_output" {>= "0.20.3"}
+  "rocq-sail-stdpp" {>= "0.20.3"}
+  "conf-cmake"
+]
+synopsis:
+  "A model of the RISC-V instruction set architecture in Rocq, generated from Sail"

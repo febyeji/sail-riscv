@@ -1,3 +1,5 @@
+# Generated from rocq-sail-riscv.opam.in; regenerate with:
+#   cmake -P rocq-sail-riscv.cmake
 opam-version: "2.0"
 name: "rocq-sail-riscv"
 version: "@sail_riscv_release_version@"

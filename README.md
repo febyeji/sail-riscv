@@ -392,6 +392,26 @@ tool.
 The files under [`handwritten_support`](./handwritten_support) provide library definitions for
 each prover.
 
+### Installing the Rocq model with opam
+
+The `rocq-sail-riscv` package builds the RV32D and RV64D Rocq models and
+installs them under the `Riscv` namespace in the active opam switch.
+With opam initialized and an OCaml switch selected, run these commands
+from the repository root:
+
+```sh
+opam repo add rocq-released https://rocq-prover.org/opam/released
+opam update
+eval $(opam env)
+opam install .
+```
+
+opam installs the Sail and Rocq dependencies. The build also needs a C/C++
+toolchain, CMake 3.20 or later, and GMP development headers.
+
+For changes to the package definition, see
+[Updating the Rocq opam package](CONTRIBUTING.md#updating-the-rocq-opam-package).
+
 ## Directory Structure
 
 ```

@@ -36,6 +36,13 @@ jobs:
         with:
           sail-version: ${{ env.SAIL_VERSION }}
 
+      - name: Check opam package metadata
+        run: |
+          git ls-files --error-unmatch rocq-sail-riscv.opam
+          cmake -P rocq-sail-riscv.cmake
+          git diff --exit-code -- rocq-sail-riscv.opam
+          opam lint rocq-sail-riscv.opam
+
       - name: Restore cached opam
         id: cache-rocq-opam-restore
         uses: actions/cache/restore@v6
@@ -80,7 +87,6 @@ jobs:
       - name: Build Rocq model
         run: |
           eval `opam env --safe`
-          cmake -P rocq-sail-riscv.cmake
           # Ignore dune constraints because they come from the fake sail packages
           # Assume depexts because we've already installed cmake, but opam doesn't realise
           opam install --yes --verbose --ignore-constraints-on=dune --assume-depexts ./rocq-sail-riscv.opam
